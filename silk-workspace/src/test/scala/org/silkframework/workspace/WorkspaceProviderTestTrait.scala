@@ -46,7 +46,7 @@ trait WorkspaceProviderTestTrait extends FlatSpec with ShouldMatchers with Mocki
 
   private val refreshTest = withRefresh(PROJECT_NAME)(_)
 
-  private val workspaceProvider = createWorkspaceProvider()
+  val workspaceProvider: WorkspaceProvider = createWorkspaceProvider()
 
   private val repository = InMemoryResourceRepository()
 
@@ -55,7 +55,6 @@ trait WorkspaceProviderTestTrait extends FlatSpec with ShouldMatchers with Mocki
   private val projectResources = repository.get(PROJECT_NAME)
 
   private lazy val project = workspace.project(PROJECT_NAME)
-  private lazy val projectOther = workspace.project(PROJECT_NAME_OTHER)
 
   val rule =
     LinkageRule(
@@ -218,7 +217,8 @@ trait WorkspaceProviderTestTrait extends FlatSpec with ShouldMatchers with Mocki
     project.addTask[GenericDatasetSpec](DUMMY_DATASET, DatasetSpec(dummyDataset))
     workspaceProvider.putTask(PROJECT_NAME, dataset)
     refreshTest {
-      val ds = workspaceProvider.readTasks[GenericDatasetSpec](PROJECT_NAME, projectResources).filter(_.id.toString == DATASET_ID).headOption.get
+      val tasks = workspaceProvider.readTasks[GenericDatasetSpec](PROJECT_NAME, projectResources)
+      val ds = tasks.find(_.id.toString == DATASET_ID).get
       ds shouldBe dataset
     }
   }
@@ -226,7 +226,7 @@ trait WorkspaceProviderTestTrait extends FlatSpec with ShouldMatchers with Mocki
   it should "update dataset tasks" in {
     workspaceProvider.putTask(PROJECT_NAME, datasetUpdated)
     refreshTest {
-      val ds = workspaceProvider.readTasks[GenericDatasetSpec](PROJECT_NAME, projectResources).filter(_.id.toString == DATASET_ID).headOption.get
+      val ds = workspaceProvider.readTasks[GenericDatasetSpec](PROJECT_NAME, projectResources).find(_.id.toString == DATASET_ID).get
       ds shouldBe datasetUpdated
     }
   }
