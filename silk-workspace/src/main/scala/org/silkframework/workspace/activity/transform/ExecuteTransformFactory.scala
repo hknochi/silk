@@ -10,7 +10,7 @@ import org.silkframework.workspace.activity.TaskActivityFactory
 import org.silkframework.workspace.activity.transform.TransformTaskUtils._
 
 @Plugin(
-  id = ExecuteTransformFactory.ID,
+  id = ExecuteTransformFactory.pluginId,
   label = "Execute Transform",
   categories = Array("TransformSpecification"),
   description = "Executes the transformation."
@@ -22,6 +22,7 @@ case class ExecuteTransformFactory(
   override def apply(task: ProjectTask[TransformSpec]): Activity[TransformReport] = {
     Activity.regenerating {
       new ExecuteTransform(
+        task.taskLabel(),
         // No user context here, defer fetching data sources
         (userContext: UserContext) => task.dataSource(userContext),
         task.data,
@@ -34,6 +35,6 @@ case class ExecuteTransformFactory(
 
 object ExecuteTransformFactory {
 
-  final val ID = "ExecuteTransform"
+  final val pluginId = "ExecuteTransform"
 
 }

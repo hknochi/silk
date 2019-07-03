@@ -2,6 +2,7 @@ package controllers.transform
 
 import controllers.core.{RequestUserContextAction, UserContextAction}
 import controllers.core.util.ControllerUtilsTrait
+import javax.inject.Inject
 import org.silkframework.entity.Path
 import org.silkframework.rule.TransformSpec
 import org.silkframework.runtime.activity.UserContext
@@ -11,13 +12,13 @@ import org.silkframework.util.{DPair, Uri}
 import org.silkframework.workbench.Context
 import org.silkframework.workspace.WorkspaceFactory
 import org.silkframework.workspace.activity.transform.{TransformPathsCache, VocabularyCache}
-import play.api.mvc.{Action, AnyContent, Controller}
+import play.api.mvc.{Action, AnyContent, InjectedController}
 
-class TransformEditor extends Controller with ControllerUtilsTrait {
+class TransformEditor @Inject() () extends InjectedController with ControllerUtilsTrait {
 
   def start(project: String, task: String, rule: String): Action[AnyContent] = RequestUserContextAction { implicit request => implicit userContext =>
     val context = Context.get[TransformSpec](project, task, request.path)
-    val vocabularies = context.task.activity[VocabularyCache].value
+    val vocabularies = context.task.activity[VocabularyCache].value()
 
     // TODO: We should check whether the rule exists
     Ok(views.html.editor.transformRules(context, vocabularies, rule))
@@ -36,7 +37,7 @@ class TransformEditor extends Controller with ControllerUtilsTrait {
 
   def propertyDetails(project: String, task: String, property: String): Action[AnyContent] = RequestUserContextAction { request => implicit userContext =>
     val context = Context.get[TransformSpec](project, task, request.path)
-    val vocabularies = context.task.activity[VocabularyCache].value
+    val vocabularies = context.task.activity[VocabularyCache].value()
     val uri = Uri.parse(property, context.project.config.prefixes)
 
     Ok(views.html.editor.propertyDetails(property, vocabularies.findProperty(uri.uri), context.project.config.prefixes))
@@ -51,11 +52,11 @@ class TransformEditor extends Controller with ControllerUtilsTrait {
       case Some((_, sourcePath)) =>
         val pathsCache = transformTask.activity[TransformPathsCache]
         pathsCache.control.waitUntilFinished()
-        if(pathsCache.status.failed) {
+        if(pathsCache.status().failed) {
           Ok(views.html.editor.paths(DPair(sourceName, ""), DPair.fill(Seq.empty), onlySource = true,
-            warning = pathsCache.status.message,  project = project))
+            warning = pathsCache.status().message,  project = project))
         } else {
-          val relativePaths = pathsCache.value.configuredSchema.typedPaths. // FIXME: This won't work inside nested object rules for RDF datasets
+          val relativePaths = pathsCache.value().configuredSchema.typedPaths. // FIXME: This won't work inside nested object rules for RDF datasets
               filter(tp => tp.operators.startsWith(sourcePath) && tp.operators.size > sourcePath.size).
               map(tp => Path(tp.operators.drop(sourcePath.size)))
           val paths = DPair(relativePaths.map(_.serialize()(prefixes)), Seq.empty)
@@ -74,7 +75,7 @@ class TransformEditor extends Controller with ControllerUtilsTrait {
     val sourceName = task.data.selection.inputId.toString
 
     if(pathsCache.status().isRunning) {
-      val loadingMsg = f"Cache loading (${pathsCache.status().progress * 100}%.1f%%)"
+      val loadingMsg = f"Cache loading (${pathsCache.status().progress.getOrElse(0.0) * 100}%.1f%%)"
       ServiceUnavailable(views.html.editor.paths(DPair(sourceName, ""), DPair.fill(Seq.empty), onlySource = true, loadingMsg = loadingMsg, project = project))
     } else if(pathsCache.status().failed) {
       Ok(views.html.editor.paths(DPair(sourceName, ""), DPair.fill(Seq.empty), onlySource = true, warning = pathsCache.status().message,  project = project))

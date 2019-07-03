@@ -10,8 +10,7 @@ GET           /:project/:task/editor/widgets/score                              
 # Evaluate
 GET           /:project/:task/evaluate                                                      controllers.linking.EvaluateLinkingController.generateLinks(project: String, task: String)
 GET           /:project/:task/evaluate/links/:sorting/:filter/:page                         controllers.linking.EvaluateLinkingController.links(project: String, task: String, sorting: String, filter: String, page: Int)
-GET           /:project/:task/evaluate/linksStream                                          controllers.linking.EvaluateLinkingController.linksStream(project: String, task: String)
-GET           /:project/:task/evaluate/statusStream                                         controllers.linking.EvaluateLinkingController.statusStream(project: String, task: String)
+GET           /:project/:task/evaluate/linksStream                                          controllers.linking.EvaluateLinkingController.linksWebsocket(project: String, task: String)
 
 # Execute
 GET           /:project/:task/execute                                                       controllers.linking.ExecuteLinkingController.execute(project: String, task: String)
@@ -28,10 +27,7 @@ GET           /:project/:task/learnStart                                        
 GET           /:project/:task/learn                                                         controllers.linking.Learning.learn(project: String, task: String)
 GET           /:project/:task/activeLearn                                                   controllers.linking.Learning.activeLearn(project: String, task: String)
 GET           /:project/:task/learn/rule                                                    controllers.linking.Learning.rule(project: String, task: String)
-GET           /:project/:task/learn/ruleStream                                              controllers.linking.Learning.ruleStream(project: String, task: String)
 GET           /:project/:task/learn/links/:sorting/:filter/:page                            controllers.linking.Learning.links(project: String, task: String, sorting: String, filter: String, page: Int)
-GET           /:project/:task/learn/linksStream                                             controllers.linking.Learning.linksStream(project: String, task: String)
-GET           /:project/:task/learn/statusStream                                            controllers.linking.Learning.statusStream(project: String, task: String)
 GET           /:project/:task/learn/population                                              controllers.linking.Learning.population(project: String, task: String)
 GET           /:project/:task/learn/populationView/:page                                    controllers.linking.Learning.populationView(project: String, task: String, page: Int)
 GET           /:project/:task/activeLearnDetails                                            controllers.linking.Learning.activeLearnDetails(project: String, task: String)
@@ -58,5 +54,7 @@ POST          /tasks/:project/:task/reloadCache                                 
 PUT           /tasks/:project/:task/writeReferenceLinks                             controllers.linking.LinkingTaskApi.writeReferenceLinks(project: String, task: String)
 PUT           /tasks/:project/:task/learningTask                                    controllers.linking.LinkingTaskApi.learningActivity(project: String, task: String)
 PUT           /tasks/:project/:task/activeLearningTask                              controllers.linking.LinkingTaskApi.activeLearningActivity(project: String, task: String)
+
+GET           /tasks/:project/:task/referenceLinksEvaluated                         controllers.linking.LinkingTaskApi.referenceLinksEvaluated(project: String, task: String)
 
 POST          /tasks/:project/:task/postLinkDatasource                              controllers.linking.LinkingTaskApi.postLinkDatasource(project: String, task: String)

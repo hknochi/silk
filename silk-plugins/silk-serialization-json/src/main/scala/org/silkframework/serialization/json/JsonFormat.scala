@@ -1,9 +1,11 @@
 package org.silkframework.serialization.json
 
 import org.silkframework.runtime.serialization.{ReadContext, SerializationFormat, WriteContext}
-import play.api.libs.json.{JsValue, Json}
+import play.api.libs.json.{JsError, JsPath, JsResult, JsResultException, JsSuccess, JsValue, Json, JsonValidationError, Reads}
 
+import scala.collection.Seq
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 /**
   * JSON serialization format.
@@ -24,7 +26,7 @@ abstract class JsonFormat[T: ClassTag] extends SerializationFormat[T, JsValue] {
     * Formats a JSON value as string.
     */
   def toString(value: T, mimeType: String)(implicit writeContext: WriteContext[JsValue]): String = {
-    Json.stringify(write(value))
+    Json.prettyPrint(write(value))
   }
 
   /**
@@ -51,11 +53,27 @@ abstract class JsonFormat[T: ClassTag] extends SerializationFormat[T, JsValue] {
     sb.append(s"]")
     sb.toString()
   }
+
+  /**
+    * Generates a play Reads instance.
+    */
+  def reader(implicit readContext: ReadContext = ReadContext()): Reads[T] = {
+    new Reads[T] {
+      def reads(json: JsValue): JsResult[T] = {
+        try {
+          JsSuccess(read(json))
+        } catch {
+          case JsResultException(errors) =>
+            JsError(errors)
+        }
+      }
+    }
+  }
 }
 
 abstract class WriteOnlyJsonFormat[T: ClassTag] extends JsonFormat[T] {
 
-  override def read(value: JsValue)(implicit readContext: ReadContext): T = {
+  override final def read(value: JsValue)(implicit readContext: ReadContext): T = {
     throw new UnsupportedOperationException(s"Parsing values of type ${implicitly[ClassTag[T]].runtimeClass.getSimpleName} from Json is not supported at the moment")
   }
 

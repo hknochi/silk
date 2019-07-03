@@ -3,11 +3,11 @@ package controllers.transform
 import controllers.core.{RequestUserContextAction, UserContextAction}
 import controllers.core.util.ControllerUtilsTrait
 import controllers.util.SerializationUtils._
+import javax.inject.Inject
 import org.silkframework.rule.TransformSpec
 import org.silkframework.rule.vocab.{VocabularyClass, VocabularyProperty}
 import org.silkframework.runtime.activity.UserContext
 import org.silkframework.runtime.serialization.WriteContext
-import org.silkframework.runtime.users.WebUserManager
 import org.silkframework.runtime.validation.NotFoundException
 import org.silkframework.serialization.json.JsonSerializers
 import org.silkframework.util.Uri
@@ -15,22 +15,22 @@ import org.silkframework.workbench.utils.ErrorResult
 import org.silkframework.workspace.activity.transform.VocabularyCache
 import org.silkframework.workspace.{Project, WorkspaceFactory}
 import play.api.libs.json.{JsValue, Json, Writes}
-import play.api.mvc.{Action, AnyContent, Controller}
+import play.api.mvc.{Action, AnyContent, InjectedController}
 
 /**
   * Provides access to the target vocabulary.
   */
-class TargetVocabularyApi extends Controller with ControllerUtilsTrait {
+class TargetVocabularyApi  @Inject() () extends InjectedController with ControllerUtilsTrait {
 
   /** Returns meta data for a vocabulary class */
   def getTypeInfo(projectName: String, transformTaskName: String, typeUri: String): Action[AnyContent] = RequestUserContextAction { implicit request => implicit userContext =>
     implicit val (project, task) = projectAndTask[TransformSpec](projectName, transformTaskName)
-    val vocabularies = task.activity[VocabularyCache].value
+    val vocabularies = task.activity[VocabularyCache].value()
     val fullTypeUri = Uri.parse(typeUri, project.config.prefixes)
 
     vocabularies.findClass(fullTypeUri.uri) match {
       case Some(vocabType) =>
-        serializeCompileTime(vocabType)
+        serializeCompileTime(vocabType, Some(project))
       case None =>
         ErrorResult(NotFoundException(s"Type $typeUri could not be found in any of the target vocabularies."))
     }
@@ -41,12 +41,12 @@ class TargetVocabularyApi extends Controller with ControllerUtilsTrait {
                       transformTaskName: String,
                       propertyUri: String): Action[AnyContent] = RequestUserContextAction { implicit request => implicit userContext =>
     implicit val (project, task) = projectAndTask[TransformSpec](projectName, transformTaskName)
-    val vocabularies = task.activity[VocabularyCache].value
+    val vocabularies = task.activity[VocabularyCache].value()
     val fullPropertyUri = Uri.parse(propertyUri, project.config.prefixes)
 
     vocabularies.findProperty(fullPropertyUri.uri) match {
       case Some(vocabProperty) =>
-        serializeCompileTime(vocabProperty)
+        serializeCompileTime(vocabProperty, Some(project))
       case None =>
         ErrorResult(NotFoundException(s"Property $propertyUri could not be found in any of the target vocabularies."))
     }
@@ -59,14 +59,14 @@ class TargetVocabularyApi extends Controller with ControllerUtilsTrait {
                             transformTaskName: String,
                             uri: String): Action[AnyContent] = RequestUserContextAction { implicit request => implicit userContext =>
     implicit val (project, task) = projectAndTask[TransformSpec](projectName, transformTaskName)
-    val vocabularies = task.activity[VocabularyCache].value
+    val vocabularies = task.activity[VocabularyCache].value()
     val fullUri = Uri.parse(uri, project.config.prefixes)
 
     (vocabularies.findClass(fullUri.uri), vocabularies.findProperty(fullUri.uri)) match {
       case (Some(vocabType), None) =>
-        serializeCompileTime(vocabType)
+        serializeCompileTime(vocabType, Some(project))
       case (None, Some(vocabProperty)) =>
-        serializeCompileTime(vocabProperty)
+        serializeCompileTime(vocabProperty, Some(project))
       case (None, None) =>
         ErrorResult(NotFoundException(s"Property or Class $uri could not be found in any of the target vocabularies."))
       case (Some(_), Some(_)) =>
@@ -98,7 +98,7 @@ class TargetVocabularyApi extends Controller with ControllerUtilsTrait {
                                          addBackwardRelations: Boolean)
                                         (implicit userContext: UserContext): (Seq[VocabularyProperty], Seq[VocabularyProperty]) = {
     val task = project.task[TransformSpec](taskName)
-    val vocabularies = task.activity[VocabularyCache].value
+    val vocabularies = task.activity[VocabularyCache].value()
     val vocabularyClasses = vocabularies.flatMap(v => v.getClass(classUri).map(c => (v, c)))
 
     def filterProperties(propFilter: (VocabularyProperty, List[String]) => Boolean): Seq[VocabularyProperty] = {

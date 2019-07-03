@@ -98,7 +98,8 @@ case class TransformSpec(selection: DatasetSelection,
     Seq(
       ("Source", selection.inputId.toString),
       ("Type", selection.typeUri.toString),
-      ("Restriction", selection.restriction.toString)
+      ("Restriction", selection.restriction.toString),
+      ("Outputs", outputs.mkString(", "))
     )
   }
 
@@ -112,7 +113,7 @@ case class TransformSpec(selection: DatasetSelection,
     schemata :+= RuleSchemata.create(rule, selection, subPath)
 
     // Add rule schemata of all child object rules
-    for(objectMapping @ ObjectMapping(_, relativePath, _, _, _) <- rule.rules.allRules) {
+    for(objectMapping @ ObjectMapping(_, relativePath, _, _, _, _) <- rule.rules.allRules) {
       schemata ++= collectSchemata(objectMapping.fillEmptyUriRule, subPath ++ relativePath)
     }
 

@@ -1,9 +1,10 @@
 package org.silkframework.runtime.activity
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.ForkJoinPool.ManagedBlocker
 import java.util.logging.Logger
 
-import scala.reflect.ClassTag._
 import scala.reflect.ClassTag
+import scala.reflect.ClassTag._
 
 /**
   * Holds the current status and value of an activity, but does not control its execution.
@@ -15,11 +16,11 @@ import scala.reflect.ClassTag
   * @tparam T The value type. Set to [[Unit]] if no values are generated.
   */
 class ActivityMonitor[T](name: String,
-   parent: Option[ActivityContext[_]] = None,
-   progressContribution: Double = 0.0,
-   initialValue: => Option[T] = None,
-   val contextMetaData: Option[ActivityContextData[_]] = None
-) extends ActivityContext[T] {
+                         parent: Option[ActivityContext[_]] = None,
+                         progressContribution: Double = 0.0,
+                         initialValue: => Option[T] = None,
+                         val contextMetaData: Option[ActivityContextData[_]] = None,
+                         projectAndTaskId: Option[ProjectAndTaskIds] = None) extends ActivityContext[T] {
 
   /**
     * Holds all current child activities.
@@ -43,7 +44,7 @@ class ActivityMonitor[T](name: String,
   /**
     * Retrieves current status of the activity.
     */
-  override val status: StatusHolder = new StatusHolder(log, parent.map(_.status), progressContribution)
+  override val status: StatusHolder = new StatusHolder(log, parent.map(_.status), progressContribution, projectAndTaskId = projectAndTaskId)
 
   /**
     * Adds a child activity.
@@ -55,9 +56,37 @@ class ActivityMonitor[T](name: String,
     * @return The activity control for the child activity.
     */
   override def child[R](activity: Activity[R], progressContribution: Double): ActivityControl[R] = {
-    val execution = new ActivityExecution(activity, Some(this), progressContribution)
+    val execution = new ActivityExecution(activity, Some(this), progressContribution, projectAndTaskId = projectAndTaskId)
     addChild(execution)
     execution
+  }
+
+  /**
+    * Blocks execution until a given condition is met.
+    * This should be called by Activities whenever they are waiting indefinitely.
+    *
+    * @param condition Evaluates the condition to wait for. Will be called frequently.
+    */
+  def blockUntil(condition: () => Boolean): Unit = {
+    val sleepTime = 500
+    while(!condition()) {
+      ForkJoinPool.managedBlock(
+        new ManagedBlocker {
+          @volatile
+          private var releasable = false
+
+          override def block(): Boolean = {
+            Thread.sleep(sleepTime)
+            releasable = true
+            true
+          }
+
+          override def isReleasable: Boolean = {
+            releasable
+          }
+        }
+      )
+    }
   }
 
   /**

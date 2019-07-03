@@ -15,7 +15,6 @@
 package org.silkframework.workspace
 
 import java.time.Instant
-import java.util.concurrent.{ScheduledFuture, TimeUnit}
 import java.util.logging.{Level, Logger}
 
 import org.silkframework.config.{MetaData, Prefixes, Task, TaskSpec}
@@ -58,7 +57,8 @@ class ProjectTask[TaskType <: TaskSpec : ClassTag](val id: Identifier,
     implicit val resources: ResourceManager = module.project.resources
     val taskType = data.getClass
     val factories = PluginRegistry.availablePlugins[TaskActivityFactory[TaskType, _ <: HasValue]]
-        .map(_.apply()).filter(_.taskType.isAssignableFrom(taskType))
+                                  .map(_.apply())
+                                  .filter(a => a.taskType.isAssignableFrom(taskType) && a.generateForTask(data))
     var activities = List[TaskActivity[TaskType, _ <: HasValue]]()
     for (factory <- factories) {
       try {
@@ -90,7 +90,7 @@ class ProjectTask[TaskType <: TaskSpec : ClassTag](val id: Identifier,
 
   def init()(implicit userContext: UserContext): Unit = {
     // Start auto-run activities
-    for (activity <- taskActivities if activity.autoRun && activity.status == Status.Idle())
+    for (activity <- taskActivities if activity.autoRun && activity.status() == Status.Idle())
       activity.control.start()
   }
 
@@ -112,7 +112,7 @@ class ProjectTask[TaskType <: TaskSpec : ClassTag](val id: Identifier,
       )
     )
     persistTask
-    log.info("Updated task '" + id + "'")
+    log.info(s"Updated task '$id' of project ${project.name}." + userContext.logInfo)
   }
 
   /**
@@ -174,16 +174,9 @@ class ProjectTask[TaskType <: TaskSpec : ClassTag](val id: Identifier,
   private def persistTask(implicit userContext: UserContext): Unit = {
     // Write task
     module.provider.putTask(project.name, ProjectTask.this)
-    log.info(s"Persisted task '$id' in project '${project.name}'")
-    // Update caches
+    // Restart each activity, don't wait for completion.
     for (activity <- taskActivities if activity.autoRun) {
-      if(!activity.control.status().isRunning) {
-        try {
-          activity.control.start()
-        } catch {
-          case _: IllegalStateException => // ignore possible race condition that the activity was started since the check
-        }
-      }
+      activity.control.restart()
     }
   }
 
@@ -209,6 +202,4 @@ object ProjectTask {
 
   /* Do not persist updates more frequently than this (in seconds) */
   val writeInterval = 3
-
-  private val scheduledExecutor = Execution.createScheduledThreadPool(getClass.getSimpleName, 1)
 }
