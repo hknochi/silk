@@ -5,6 +5,8 @@ import java.util.concurrent.ForkJoinPool.ForkJoinWorkerThreadFactory
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.{Level, Logger}
+import java.util.concurrent.RejectedExecutionHandler
+import java.util.concurrent.ThreadPoolExecutor
 
 import scala.math.max
 
@@ -47,9 +49,23 @@ object Execution {
     *
     * @param name A label to be used for naming threads. Helps debugging and finding threads that belong to this pool.
     * @param numberOfThreads The number of threads in the pool
+    * @param maxPoolSize If None, the max pool size will be set to numberOfThreads, else it will be set to this value
     */
-  def createFixedThreadPool(name: String, numberOfThreads: Int): ExecutorService = {
-    Executors.newFixedThreadPool(numberOfThreads, new PrefixedThreadFactory(name))
+  def createFixedThreadPool(name: String,
+                            numberOfThreads: Int,
+                            workQueue: BlockingQueue[Runnable] = new LinkedBlockingQueue[Runnable](),
+                            rejectedExecutionHandler: Option[RejectedExecutionHandler] = None,
+                            maxPoolSize: Option[Int] = None,
+                            keepAliveInMs: Long = 0L): ThreadPoolExecutor = {
+    val tpe = new ThreadPoolExecutor(
+      numberOfThreads,
+      maxPoolSize.getOrElse(numberOfThreads),
+      keepAliveInMs,
+      TimeUnit.MILLISECONDS,
+      workQueue,
+      new PrefixedThreadFactory(name))
+    rejectedExecutionHandler.foreach(tpe.setRejectedExecutionHandler)
+    tpe
   }
 
   /**

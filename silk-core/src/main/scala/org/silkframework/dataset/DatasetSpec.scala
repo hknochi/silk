@@ -25,6 +25,7 @@ import org.silkframework.runtime.serialization.{ReadContext, WriteContext, XmlFo
 import org.silkframework.util.{Identifier, Uri}
 
 import scala.language.implicitConversions
+import scala.reflect.ClassTag
 import scala.xml.Node
 
 /**
@@ -166,8 +167,6 @@ object DatasetSpec {
 
     private val log = Logger.getLogger(DatasetSpec.getClass.getName)
 
-    private var entityCount: Int = 0
-
     private var isOpen = false
 
     /**
@@ -186,7 +185,6 @@ object DatasetSpec {
         }
 
       entitySink.openTable(typeUri, uriTypedProperty ++ properties)
-      entityCount = 0
       isOpen = true
     }
 
@@ -199,8 +197,6 @@ object DatasetSpec {
         case None =>
           entitySink.writeEntity(subject, values)
       }
-
-      entityCount += 1
     }
 
     /**
@@ -217,7 +213,6 @@ object DatasetSpec {
     override def close()(implicit userContext: UserContext) {
       if (entitySink != null) entitySink.close()
       isOpen = false
-      log.info(s"Wrote $entityCount entities.")
     }
 
     /**

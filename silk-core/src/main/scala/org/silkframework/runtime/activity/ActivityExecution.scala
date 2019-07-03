@@ -1,15 +1,21 @@
 package org.silkframework.runtime.activity
 
 import java.util.concurrent.ForkJoinPool.ManagedBlocker
-import java.util.concurrent.{ForkJoinPool, ForkJoinTask, TimeUnit}
+import java.util.concurrent._
 
 import org.silkframework.runtime.activity.Status.{Canceling, Finished}
+import org.silkframework.runtime.execution.Execution
+import org.silkframework.runtime.execution.Execution.PrefixedThreadFactory
 
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.util.Try
 import scala.util.control.NonFatal
 
 private class ActivityExecution[T](activity: Activity[T],
                                    parent: Option[ActivityContext[_]] = None,
-                                   progressContribution: Double = 0.0) extends ActivityMonitor[T](activity.name, parent, progressContribution, activity.initialValue)
+                                   progressContribution: Double = 0.0,
+                                   projectAndTaskId: Option[ProjectAndTaskIds])
+    extends ActivityMonitor[T](activity.name, parent, progressContribution, activity.initialValue, projectAndTaskId = projectAndTaskId)
     with ActivityControl[T] {
 
   /**
@@ -64,7 +70,7 @@ private class ActivityExecution[T](activity: Activity[T],
 
   private def setStartMetaData(user: UserContext) = {
     resetMetaData()
-    status.update(Status.Started())
+    status.update(Status.Waiting())
     this.startedByUser = user
   }
 
@@ -97,6 +103,20 @@ private class ActivityExecution[T](activity: Activity[T],
     activity.resetCancelFlag()
   }
 
+  /** Restarts the activity. */
+  override def restart()(implicit userContext: UserContext): Future[Unit] = {
+    import ActivityExecution.activityManagementExecutionContext
+    cancel()
+    Future {
+      Try(waitUntilFinished()) // Ignore if the previous execution failed
+      try {
+        start()
+      } catch {
+        case _: IllegalStateException => // ignore possible race condition that the activity was started since the check
+      }
+    }
+  }
+
   def waitUntilFinished(): Unit = {
     for (runner <- forkJoinRunner) {
       try {
@@ -116,6 +136,7 @@ private class ActivityExecution[T](activity: Activity[T],
   override def underlying: Activity[T] = activity
 
   private def runActivity()(implicit user: UserContext): Unit = synchronized {
+    status.update(Status.Running("Running", None))
     ThreadLock.synchronized {
       runningThread = Some(Thread.currentThread())
     }
@@ -194,4 +215,20 @@ private class ActivityExecution[T](activity: Activity[T],
       releasable
     }
   }
+}
+
+object ActivityExecution {
+  // The number of threads that always exist
+  final val CORE_POOL_SIZE = 2
+  // The max. number of threads in the pool
+  final val MAX_POOL_SIZE = 32
+  // How long are extra threads kept alive, 1 second
+  final val KEEP_ALIVE_MS = 1000L
+  // Thread pool used for managing activities asynchronously, e.g. restart.
+  implicit val activityManagementExecutionContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(Execution.createFixedThreadPool(
+    "activity-management-thread",
+    CORE_POOL_SIZE,
+    maxPoolSize = Some(MAX_POOL_SIZE),
+    keepAliveInMs = KEEP_ALIVE_MS
+  ))
 }

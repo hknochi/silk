@@ -5,6 +5,7 @@ import java.util.logging.Logger
 
 import controllers.core.UserContextAction
 import controllers.transform.AutoCompletionApi.Categories
+import javax.inject.Inject
 import org.silkframework.config.Prefixes
 import org.silkframework.entity._
 import org.silkframework.rule.TransformSpec
@@ -14,7 +15,7 @@ import org.silkframework.runtime.validation.NotFoundException
 import org.silkframework.workspace.activity.transform.{TransformPathsCache, VocabularyCache}
 import org.silkframework.workspace.{ProjectTask, WorkspaceFactory}
 import play.api.libs.json.{JsArray, JsValue, Json}
-import play.api.mvc.{Action, AnyContent, Controller}
+import play.api.mvc.{InjectedController, Action, AnyContent, Controller, ControllerComponents}
 
 import scala.language.implicitConversions
 import scala.util.Try
@@ -22,7 +23,7 @@ import scala.util.Try
 /**
   * Generates auto completions for mapping paths and types.
   */
-class AutoCompletionApi extends Controller {
+class AutoCompletionApi @Inject() () extends InjectedController {
   val log: Logger = Logger.getLogger(this.getClass.getName)
 
   /**
@@ -38,7 +39,7 @@ class AutoCompletionApi extends Controller {
         val simpleSourcePath = sourcePath.filter(op => op.isInstanceOf[ForwardOperator] || op.isInstanceOf[BackwardOperator])
         val forwardOnlySourcePath = forwardOnlyPath(simpleSourcePath)
         val allPaths = pathsCacheCompletions(task, simpleSourcePath)
-        val isRdfInput = task.activity[TransformPathsCache].value.isRdfInput(task)
+        val isRdfInput = task.activity[TransformPathsCache].value().isRdfInput(task)
         // FIXME: No only generate relative "forward" paths, but also generate paths that would be accessible by following backward paths.
         val relativeForwardPaths = relativePaths(simpleSourcePath, forwardOnlySourcePath, allPaths, isRdfInput)
         // Add known paths
@@ -171,13 +172,13 @@ class AutoCompletionApi extends Controller {
 
   private def fetchCachedPaths(task: ProjectTask[TransformSpec], sourcePath: List[PathOperator])
                               (implicit userContext: UserContext): IndexedSeq[TypedPath] = {
-    val cachedSchemata = task.activity[TransformPathsCache].value
+    val cachedSchemata = task.activity[TransformPathsCache].value()
     cachedSchemata.fetchCachedPaths(task, sourcePath)
   }
 
   private def vocabularyTypeCompletions(task: ProjectTask[TransformSpec]): Completions = {
     val prefixes = task.project.config.prefixes
-    val vocabularyCache = task.activity[VocabularyCache].value
+    val vocabularyCache = task.activity[VocabularyCache].value()
 
     val typeCompletions =
       for(vocab <- vocabularyCache.vocabularies; vocabClass <- vocab.classes) yield {
@@ -195,7 +196,7 @@ class AutoCompletionApi extends Controller {
 
   private def vocabularyPropertyCompletions(task: ProjectTask[TransformSpec]): Completions = {
     val prefixes = task.project.config.prefixes
-    val vocabularyCache = task.activity[VocabularyCache].value
+    val vocabularyCache = task.activity[VocabularyCache].value()
 
     val propertyCompletions =
       for(vocab <- vocabularyCache.vocabularies; prop <- vocab.properties) yield {

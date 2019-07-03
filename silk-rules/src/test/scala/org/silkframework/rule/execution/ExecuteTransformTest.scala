@@ -22,12 +22,13 @@ class ExecuteTransformTest extends FlatSpec with Matchers with MockitoSugar {
 
   it should "output faulty entities to error output" in {
     val prop = "http://prop"
-    val prop2 = "http:// prop2"
+    val prop2 = "http://prop2"
     val outputMock = mock[EntitySink]
     val entities = Seq(entity(IndexedSeq("valid", "valid"), IndexedSeq(prop, prop2)), entity(IndexedSeq("invalid", "valid"), IndexedSeq(prop, prop2)))
     val dataSourceMock = mock[DataSource]
     when(dataSourceMock.retrieve(any(), any())(any())).thenReturn(entities)
     val execute = new ExecuteTransform(
+      taskLabel = "transform task",
       input = _ => dataSourceMock,
       transform = TransformSpec(datasetSelection(), RootMappingRule(rules = MappingRules(mapping("propTransform", prop), mapping("prop2Transform", prop2)))),
       output = _ => outputMock

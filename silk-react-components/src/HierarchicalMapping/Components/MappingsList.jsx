@@ -20,6 +20,7 @@ const MappingsList = React.createClass({
     // define property types
     propTypes: {
         rules: React.PropTypes.array.isRequired,
+        parentRuleId: React.PropTypes.string,
         // currentRuleId actually the current object mapping rule id we are viewing
     },
     getInitialState() {
@@ -63,7 +64,7 @@ const MappingsList = React.createClass({
                     childrenRules,
                     fromPos,
                     toPos,
-                    id: this.props.currentRuleId,
+                    id: this.props.parentRuleId,
                 },
             })
             .subscribe(() => {
@@ -133,7 +134,10 @@ const MappingsList = React.createClass({
         );
 
         const listItem = (index, item, provided, snapshot) => (
-            <MappingRule {...item.props} provided snapshot />
+            <MappingRule {...item.props} provided snapshot
+                handleCopy={this.props.handleCopy}
+                handleClone={this.props.handleClone}
+            />
         );
 
         const listItems = _.isEmpty(rules) ? (
@@ -162,12 +166,26 @@ const MappingsList = React.createClass({
             </DragDropContext>
         );
 
+        const openToBottomFn = () => {
+            // Calculates if the floating menu list should be opened to the top or bottom depending on the space to the top.
+            let toBottom = false;
+            try {
+                const floatButtonRect = $('.ecc-floatingactionlist button.mdl-button')[0].getBoundingClientRect();
+                const navHeaderRect = $('.ecc-silk-mapping__navheader div.mdl-card--stretch')[0].getBoundingClientRect();
+                const availableSpace = floatButtonRect.top - navHeaderRect.bottom;
+                const spaceNeededForMenuList = 200; // This is not known before the menu list is rendered, so we assume at most 4 elements
+                toBottom = availableSpace < spaceNeededForMenuList;
+            } catch(error) {}
+            return toBottom;
+        };
+
         const listActions = (
             <FloatingActionList
                 fabSize="large"
                 fixed
                 iconName="add"
-                actions={[
+                openToBottom={openToBottomFn}
+                actions={_.concat(
                     {
                         icon: 'insert_drive_file',
                         label: 'Add value mapping',
@@ -186,12 +204,17 @@ const MappingsList = React.createClass({
                             });
                         },
                     },
+                    (sessionStorage.getItem('copyingData') !== null) ? {
+                        icon: 'folder',
+                        label: 'Paste mapping',
+                        handler: () => this.props.handlePaste(),
+                    } : [],
                     {
                         icon: 'lightbulb_outline',
                         label: 'Suggest mappings',
                         handler: this.handleShowSuggestions,
                     },
-                ]}
+                )}
             />
         );
 
